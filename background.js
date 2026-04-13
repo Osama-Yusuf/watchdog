@@ -1,4 +1,4 @@
-// background.js — Page Watchdog v2.0 service worker
+// background.js — Page Watchdog v2.0.0 service worker
 
 // ── Storage Layer ─────────────────────────────────────────────
 let watchersCache = new Map(); // id -> watcher object
@@ -614,6 +614,23 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             updateBadge(w.tabId);
           }
         }
+        sendResponse({ ok: true });
+        break;
+      }
+
+      case 'PAUSE_ALL': {
+        for (const [id, w] of watchersCache) {
+          if (w.tabId === tabId && w.status === 'active') {
+            w.status = 'paused';
+            chrome.alarms.clear(`wd-poll-${id}`);
+            await saveWatcher(w);
+          }
+        }
+        if (tabId) {
+          chrome.tabs.sendMessage(tabId, { type: 'STOP_WATCH' }).catch(() => {});
+          updateBadge(tabId);
+        }
+        broadcastUpdate();
         sendResponse({ ok: true });
         break;
       }

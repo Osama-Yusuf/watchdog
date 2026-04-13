@@ -1,4 +1,4 @@
-// dashboard.js — Page Watchdog v2.0 Dashboard
+// dashboard.js — Page Watchdog v2.0.0 Dashboard
 
 let allWatchers = [];
 let allChanges = [];

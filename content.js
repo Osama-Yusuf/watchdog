@@ -1,4 +1,4 @@
-// content.js — Page Watchdog v2.0 content script
+// content.js — Page Watchdog v2.0.0 content script
 // Auto-injected on all pages via manifest content_scripts
 
 (function () {

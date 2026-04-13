@@ -5,9 +5,6 @@
   "description": "Monitors web pages for changes and notifies you instantly. Track multiple elements, view change history, and persist watchers across sessions.",
   "permissions": ["notifications", "activeTab", "storage", "scripting", "alarms", "tabs", "offscreen"],
   "host_permissions": ["<all_urls>"],
-  "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com"
-  },
   "background": {
     "service_worker": "background.js"
   },

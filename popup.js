@@ -1,4 +1,4 @@
-// popup.js — Page Watchdog v2.0
+// popup.js — Page Watchdog v2.0.0
 
 let currentTabId = null;
 let currentTabUrl = '';
@@ -38,17 +38,33 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 
 // ── Init ──────────────────────────────────────────────────────
 // Check for a pending picked element (from a previous picker session)
-chrome.storage.local.get('pendingPick', ({ pendingPick }) => {
+chrome.storage.local.get(['pendingPick', 'modalPickWatcherId'], ({ pendingPick, modalPickWatcherId }) => {
   if (pendingPick) {
-    $('selectorInput').value = pendingPick.selector;
-    currentSelectorLabel = pendingPick.selectorLabel || '';
-    if (pendingPick.selectorLabel) {
-      $('selectorLabelDisplay').textContent = pendingPick.selectorLabel;
-      $('selectorLabelDisplay').classList.add('visible');
-    }
-    if (pendingPick.isIframe) {
-      applyCompareMode('visual');
-      $('iframeHint').style.display = 'block';
+    if (modalPickWatcherId) {
+      // Re-pick from edit modal — reopen modal with new selector
+      chrome.storage.local.remove('modalPickWatcherId');
+      chrome.runtime.sendMessage({ type: 'GET_ALL_WATCHERS' }, (res) => {
+        if (chrome.runtime.lastError || !res) return;
+        const w = (res.watchers || []).find(x => x.id === modalPickWatcherId);
+        if (w) {
+          openEditModal(w);
+          $('modalSelector').value = pendingPick.selector;
+          $('modalLabel').value = pendingPick.selectorLabel || w.selectorLabel || '';
+        }
+      });
+    } else {
+      // Normal pick — populate the Watch tab
+      $('selectorInput').value = pendingPick.selector;
+      currentSelectorLabel = pendingPick.selectorLabel || '';
+      if (pendingPick.selectorLabel) {
+        $('selectorLabelDisplay').textContent = pendingPick.selectorLabel;
+        $('selectorLabelDisplay').classList.add('visible');
+      }
+      if (pendingPick.isIframe) {
+        applyCompareMode('visual');
+        $('iframeHint').style.display = 'block';
+      }
+      revealOptions();
     }
     chrome.storage.local.remove('pendingPick');
   }
@@ -68,11 +84,30 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
         if (chrome.runtime.lastError || !res) return;
         if (res.watching) {
           $('statusDot').className = 'status-dot active';
-          $('stopBtn').disabled = false;
+          $('stopRow').style.display = '';
         }
       });
     }
   );
+});
+
+// ── Progressive disclosure ────────────────────────────────────
+function revealOptions() {
+  $('revealOnPick').classList.add('visible');
+}
+
+function updateOptionsSummary() {
+  const modeLabels = { mutation: 'Instant', poll: 'Scheduled', both: 'Both' };
+  const checkLabels = { current: 'This tab', background: 'Background' };
+  const parts = [modeLabels[selectedMode] || 'Instant', checkLabels[selectedCheckMode] || 'This tab'];
+  if ($('persistentToggle').checked) parts.push('Persistent');
+  $('optionsSummary').textContent = parts.join(' · ');
+}
+
+// Options toggle
+$('optionsToggle').addEventListener('click', () => {
+  $('optionsToggle').classList.toggle('open');
+  $('optionsPanel').classList.toggle('visible');
 });
 
 // ── Mode selection ────────────────────────────────────────────
@@ -82,6 +117,7 @@ document.querySelectorAll('.mode-btn[data-mode]').forEach(btn => {
     btn.classList.add('selected');
     selectedMode = btn.dataset.mode;
     $('pollRow').classList.toggle('visible', selectedMode === 'poll' || selectedMode === 'both');
+    updateOptionsSummary();
   });
 });
 
@@ -108,14 +144,17 @@ document.querySelectorAll('.check-btn[data-check]').forEach(btn => {
       selectedMode = 'poll';
       $('pollRow').classList.add('visible');
       modeLabel.style.opacity = '0.35';
-    } else {
+    } else if (selectedCompareMode !== 'visual') {
       bgHint.style.display = 'none';
       modeBtns.forEach(b => {
         b.style.opacity = '1';
         b.style.pointerEvents = '';
       });
       modeLabel.style.opacity = '1';
+    } else {
+      bgHint.style.display = 'none';
     }
+    updateOptionsSummary();
   });
 });
 
@@ -222,23 +261,22 @@ $('startBtn').addEventListener('click', async () => {
     }
 
     $('statusDot').className = 'status-dot active';
-    $('startBtn').disabled = true;
-    $('stopBtn').disabled = false;
-    const modeHint = checkMode === 'background' ? 'Background checks running.' : 'Watching for changes.';
-    $('tipText').innerHTML = `${modeHint} <strong>Click ■ Stop All to end.</strong>`;
+    $('stopRow').style.display = '';
+    $('revealOnPick').classList.remove('visible');
+    $('selectorInput').value = '';
+    $('selectorLabelDisplay').classList.remove('visible');
+    currentSelectorLabel = '';
+    $('tipText').innerHTML = 'Watcher started. Pick another element or manage in <strong>Active</strong> tab.';
   });
 });
 
-// ── Stop all ──────────────────────────────────────────────────
+// ── Pause all ────────────────────────────────────────────────
 $('stopBtn').addEventListener('click', async () => {
   if (!currentTabId) return;
-  await ensureContentScript(currentTabId);
-  chrome.tabs.sendMessage(currentTabId, { type: 'STOP_WATCH' });
-  chrome.runtime.sendMessage({ type: 'STOP_WATCH', tabId: currentTabId }, () => {
+  chrome.runtime.sendMessage({ type: 'PAUSE_ALL', tabId: currentTabId }, () => {
     $('statusDot').className = 'status-dot';
-    $('startBtn').disabled = false;
-    $('stopBtn').disabled = true;
-    $('tipText').innerHTML = 'Use <strong>🎯 Pick</strong> to select an element for precise monitoring';
+    $('stopRow').style.display = 'none';
+    $('tipText').innerHTML = 'All watchers paused. Resume from the <strong>Active</strong> tab.';
   });
 });
 
@@ -367,6 +405,7 @@ chrome.runtime.onMessage.addListener((msg) => {
       applyCompareMode('visual');
       $('iframeHint').style.display = 'block';
     }
+    revealOptions();
     cancelPicker();
   }
   if (msg.type === 'PICKER_CANCELLED') {
@@ -380,6 +419,14 @@ chrome.runtime.onMessage.addListener((msg) => {
     if ($('panel-log').classList.contains('active')) {
       refreshLogList();
     }
+    // Auto-reset UI when no active watchers remain
+    chrome.runtime.sendMessage({ type: 'GET_STATUS', tabId: currentTabId }, (res) => {
+      if (chrome.runtime.lastError || !res) return;
+      if (!res.watching) {
+        $('statusDot').className = 'status-dot';
+        $('stopRow').style.display = 'none';
+      }
+    });
   }
 });
 
@@ -421,6 +468,17 @@ $('modalMode').addEventListener('change', toggleModalFields);
 $('modalCheckMode').addEventListener('change', toggleModalFields);
 $('modalClose').addEventListener('click', closeEditModal);
 $('modalCancelBtn').addEventListener('click', closeEditModal);
+
+// ── Modal pick button ────────────────────────────────────────
+$('modalPickBtn').addEventListener('click', async () => {
+  if (!currentTabId) return;
+  const watcherId = $('modalWatcherId').value;
+  chrome.storage.local.set({ modalPickWatcherId: watcherId });
+  closeEditModal();
+  await ensureContentScript(currentTabId);
+  chrome.tabs.sendMessage(currentTabId, { type: 'START_PICKER' });
+  window.close();
+});
 
 $('editModal').addEventListener('click', (e) => {
   if (e.target === $('editModal')) closeEditModal();
@@ -469,8 +527,12 @@ $('dashboardLink').addEventListener('click', (e) => {
   chrome.tabs.create({ url: chrome.runtime.getURL('dashboard.html') });
 });
 
-// Clear label display when selector input is manually changed
+// Clear label display when selector input is manually changed, reveal options
 $('selectorInput').addEventListener('input', () => {
   currentSelectorLabel = '';
   $('selectorLabelDisplay').classList.remove('visible');
+  if ($('selectorInput').value.trim()) revealOptions();
 });
+
+// Update options summary when persistent toggle changes
+$('persistentToggle').addEventListener('change', updateOptionsSummary);

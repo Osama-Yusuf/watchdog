@@ -3,9 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <title>Watchdog Dashboard</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@600;700;800&display=swap">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@600;700;800&display=swap');
-
   :root {
     --bg: #0d0f14;
     --surface: #13161e;
@@ -522,7 +521,7 @@
     <div class="dash-logo"><img src="icons/icon48.png" alt="" style="width:28px;height:28px;"></div>
     <div>
       <div class="dash-title">Watchdog Dashboard</div>
-      <div class="dash-subtitle">v2.0 · all watchers & change history</div>
+      <div class="dash-subtitle">v2.0.0 · all watchers & change history</div>
     </div>
   </div>
 
@@ -582,7 +581,7 @@
         <select id="modalMode">
           <option value="mutation">Instant (MutationObserver)</option>
           <option value="poll">Scheduled (interval check)</option>
-          <option value="both">Both</option>
+          <!-- <option value="both">Both</option> -->
         </select>
       </div>
       <div class="modal-field" id="modalPollGroup">
