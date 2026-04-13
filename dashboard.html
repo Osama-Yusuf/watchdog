@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Watchdog Dashboard</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@600;700;800&display=swap');
+
+  :root {
+    --bg: #0d0f14;
+    --surface: #13161e;
+    --border: #1e2330;
+    --accent: #00e5a0;
+    --accent2: #ff6b35;
+    --warn: #f59e0b;
+    --text: #e2e8f0;
+    --muted: #64748b;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+  }
+
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 40px 24px;
+  }
+
+  /* Header */
+  .dash-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 36px;
+  }
+
+  .dash-logo {
+    width: 44px; height: 44px;
+    background: var(--accent);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+
+  .dash-title { font-size: 24px; font-weight: 800; color: #fff; }
+  .dash-subtitle {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  /* Section */
+  .section {
+    margin-bottom: 36px;
+  }
+
+  .section-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* Watcher cards grid */
+  .watcher-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 14px;
+  }
+
+  .watcher-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    transition: border-color 0.2s;
+  }
+  .watcher-card.active { border-color: rgba(0,229,160,0.3); }
+  .watcher-card.paused { border-color: rgba(245,158,11,0.3); }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .card-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .card-dot.active { background: var(--accent); }
+  .card-dot.paused { background: var(--warn); }
+  .card-dot.stopped { background: var(--muted); }
+
+  .card-label {
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .card-status {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  .card-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--accent);
+    margin-left: 10px;
+    opacity: 0.85;
+  }
+
+  .card-url {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-bottom: 10px;
+  }
+
+  .card-url-link {
+    color: var(--muted);
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+  .card-url-link:hover {
+    color: var(--accent);
+    text-decoration: underline;
+  }
+
+  .card-method-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+
+  .card-method-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 4px;
+  }
+  .card-method-badge.live {
+    background: rgba(0,229,160,0.1);
+    color: var(--accent);
+    border: 1px solid rgba(0,229,160,0.2);
+  }
+  .card-method-badge.stealth {
+    background: rgba(139,92,246,0.1);
+    color: #a78bfa;
+    border: 1px solid rgba(139,92,246,0.2);
+  }
+  .card-method-badge.visual {
+    background: rgba(96,165,250,0.1);
+    color: #60a5fa;
+    border: 1px solid rgba(96,165,250,0.2);
+  }
+  .card-method-badge.content {
+    background: rgba(148,163,184,0.08);
+    color: #94a3b8;
+    border: 1px solid rgba(148,163,184,0.15);
+  }
+
+  .card-detection {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  .card-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: rgba(245,158,11,0.1);
+    color: var(--warn);
+    border: 1px solid rgba(245,158,11,0.2);
+  }
+
+  .card-stats {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 8px;
+  }
+
+  .meta-item {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .meta-value {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .card-countdown {
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .card-countdown strong {
+    color: var(--text);
+  }
+
+  .card-actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .card-btn {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 14px;
+    font: 600 11px 'JetBrains Mono', monospace;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .card-btn:hover { color: var(--text); border-color: rgba(255,255,255,0.15); }
+  .card-btn.danger:hover { color: var(--accent2); border-color: rgba(255,107,53,0.4); }
+  .card-btn.primary { color: var(--accent); border-color: rgba(0,229,160,0.25); }
+  .card-btn.primary:hover { background: rgba(0,229,160,0.08); }
+  .card-btn.edit-btn:hover { color: var(--accent); border-color: rgba(0,229,160,0.4); }
+
+  /* Expandable change history */
+  .card-expand-btn {
+    background: none;
+    border: none;
+    font: 600 10px 'JetBrains Mono', monospace;
+    color: var(--accent);
+    cursor: pointer;
+    opacity: 0.7;
+    padding: 4px 0;
+  }
+  .card-expand-btn:hover { opacity: 1; }
+
+  .card-changes {
+    display: none;
+    margin-top: 10px;
+    border-top: 1px solid var(--border);
+    padding-top: 10px;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  .card-changes.visible { display: block; }
+
+  .card-change-item {
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+  }
+  .card-change-item:last-child { border-bottom: none; }
+
+  .card-change-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+  }
+
+  .card-change-preview {
+    font-size: 11px;
+    color: var(--text);
+    opacity: 0.7;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-top: 2px;
+  }
+
+  /* Change log timeline */
+  .log-timeline { list-style: none; }
+
+  .log-entry {
+    display: flex;
+    gap: 14px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .log-entry:last-child { border-bottom: none; }
+
+  .log-time-col {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    flex-shrink: 0;
+    width: 80px;
+    padding-top: 2px;
+  }
+
+  .log-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .log-watcher-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 3px;
+  }
+
+  .log-preview-text {
+    font-size: 12px;
+    color: var(--text);
+    opacity: 0.7;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Filter row */
+  .filter-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .filter-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  .filter-select {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 6px 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.7;
+  }
+
+  /* ── Edit Modal ──────────────────────────── */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.65);
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.visible { display: flex; }
+
+  .modal {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    width: 420px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 22px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .modal-title {
+    font-size: 16px;
+    font-weight: 800;
+    color: #fff;
+  }
+  .modal-close {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 22px;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+  }
+  .modal-close:hover { color: var(--text); }
+
+  .modal-body { padding: 18px 22px; }
+
+  .modal-field { margin-bottom: 14px; }
+  .modal-field-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .modal-field input[type="text"] {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 9px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text);
+    outline: none;
+  }
+  .modal-field input[type="text"]:focus { border-color: rgba(0,229,160,0.4); }
+  .modal-field select {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 9px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text);
+    outline: none;
+    cursor: pointer;
+  }
+
+  .modal-toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .toggle-switch {
+    position: relative;
+    width: 40px; height: 22px;
+    flex-shrink: 0;
+  }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider {
+    position: absolute; inset: 0; cursor: pointer;
+    background: var(--border); border-radius: 22px;
+    transition: background 0.2s;
+  }
+  .toggle-slider::before {
+    content: ''; position: absolute;
+    width: 18px; height: 18px; left: 2px; bottom: 2px;
+    background: var(--muted); border-radius: 50%;
+    transition: all 0.2s;
+  }
+  .toggle-switch input:checked + .toggle-slider { background: rgba(0,229,160,0.3); }
+  .toggle-switch input:checked + .toggle-slider::before { transform: translateX(18px); background: var(--accent); }
+  .toggle-label-text {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .modal-footer {
+    display: flex;
+    gap: 10px;
+    padding: 0 22px 18px;
+  }
+  .modal-btn {
+    flex: 1;
+    padding: 10px 16px;
+    border-radius: 9px;
+    border: none;
+    font: 700 13px/1 'Syne', sans-serif;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .modal-btn-save {
+    background: var(--accent);
+    color: #000;
+  }
+  .modal-btn-save:hover { box-shadow: 0 0 20px rgba(0,229,160,0.3); }
+  .modal-btn-cancel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .modal-btn-cancel:hover { color: var(--text); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <div class="dash-header">
+    <div class="dash-logo"><img src="icons/icon48.png" alt="" style="width:28px;height:28px;"></div>
+    <div>
+      <div class="dash-title">Watchdog Dashboard</div>
+      <div class="dash-subtitle">v2.0 · all watchers & change history</div>
+    </div>
+  </div>
+
+  <!-- Watchers section -->
+  <div class="section">
+    <div class="section-title">// Watchers</div>
+    <div class="watcher-grid" id="watcherGrid"></div>
+  </div>
+
+  <!-- Change log section -->
+  <div class="section">
+    <div class="section-title">// Change Log</div>
+    <div class="filter-row">
+      <span class="filter-label">Filter by watcher:</span>
+      <select class="filter-select" id="logFilter">
+        <option value="all">All watchers</option>
+      </select>
+    </div>
+    <ul class="log-timeline" id="logTimeline"></ul>
+  </div>
+
+</div>
+
+<!-- Edit modal -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Edit Watcher</span>
+      <button class="modal-close" id="modalClose">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="modalWatcherId">
+      <div class="modal-field">
+        <div class="modal-field-label">Label</div>
+        <input type="text" id="modalLabel" placeholder="Watcher label">
+      </div>
+      <div class="modal-field">
+        <div class="modal-field-label">CSS Selector</div>
+        <input type="text" id="modalSelector" placeholder="blank = full page">
+      </div>
+      <div class="modal-field">
+        <div class="modal-field-label">Compare By</div>
+        <select id="modalCompareMode">
+          <option value="content">Content (text/DOM)</option>
+          <option value="visual">Visual (screenshot)</option>
+        </select>
+      </div>
+      <div class="modal-field">
+        <div class="modal-field-label">Check Method</div>
+        <select id="modalCheckMode">
+          <option value="current">This tab (live)</option>
+          <option value="background">Background tab (stealth)</option>
+        </select>
+      </div>
+      <div class="modal-field" id="modalModeGroup">
+        <div class="modal-field-label">Detection Mode</div>
+        <select id="modalMode">
+          <option value="mutation">Instant (MutationObserver)</option>
+          <option value="poll">Scheduled (interval check)</option>
+          <option value="both">Both</option>
+        </select>
+      </div>
+      <div class="modal-field" id="modalPollGroup">
+        <div class="modal-field-label">Poll Interval</div>
+        <select id="modalPollInterval">
+          <option value="15000">15 seconds</option>
+          <option value="30000">30 seconds</option>
+          <option value="60000">1 minute</option>
+          <option value="120000">2 minutes</option>
+          <option value="300000">5 minutes</option>
+        </select>
+      </div>
+      <div class="modal-field">
+        <div class="modal-field-label">Notification Cooldown</div>
+        <select id="modalCooldown">
+          <option value="10000">10 seconds</option>
+          <option value="30000">30 seconds</option>
+          <option value="60000">1 minute</option>
+          <option value="300000">5 minutes</option>
+        </select>
+      </div>
+      <div class="modal-field">
+        <div class="modal-toggle-row">
+          <label class="toggle-switch">
+            <input type="checkbox" id="modalPersistent">
+            <span class="toggle-slider"></span>
+          </label>
+          <span class="toggle-label-text">Persistent — auto-restart on page load</span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="modal-btn modal-btn-cancel" id="modalCancelBtn">Cancel</button>
+      <button class="modal-btn modal-btn-save" id="modalSaveBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<script src="dashboard.js"></script>
+</body>
+</html>
